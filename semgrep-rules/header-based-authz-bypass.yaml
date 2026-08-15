@@ -1,0 +1,21 @@
+rules:
+  - id: header-based-authz-bypass
+    languages: [python]
+    severity: ERROR
+    message: >
+      An authorization decision appears to be based on a client-controlled
+      request header rather than a server-verified value (like a role
+      stored in the session or database). Headers are fully attacker-
+      controlled and must never be trusted for access control decisions.
+    patterns:
+      - pattern-either:
+          - pattern: |
+              $VAR = request.headers.get(...)
+              ...
+              if $VAR:
+                  ...
+          - pattern: |
+              $VAR = request.headers.get(...).lower() == "..."
+              ...
+              if $VAR:
+                  ...

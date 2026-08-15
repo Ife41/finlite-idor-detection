@@ -1,0 +1,19 @@
+rules:
+  - id: idor-missing-ownership-check
+    languages: [python]
+    severity: ERROR
+    message: >
+      This route fetches a record by ID and returns it, but there's no
+      visible check comparing its owner to the logged-in user's session.
+      This is a potential IDOR (Insecure Direct Object Reference).
+    patterns:
+      - pattern: |
+          $ROW = $CONN.execute($QUERY, $PARAMS).fetchone()
+          ...
+          return jsonify(dict($ROW))
+      - pattern-not: |
+          $ROW = $CONN.execute($QUERY, $PARAMS).fetchone()
+          ...
+          if $ROW[$KEY] == session[$SESSKEY]:
+              ...
+              return jsonify(dict($ROW))
