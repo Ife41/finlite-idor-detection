@@ -3,7 +3,7 @@ FinLite - A demo fintech-style organization web app used to practice and
 demonstrate multiple vulnerability classes. Each intentional vulnerability
 is clearly commented with a VULN tag.
 
-INTENTIONALLY VULNERABLE. For isolated lab use only — never expose this
+INTENTIONALLY VULNERABLE. For isolated lab use only, never expose this
 to an untrusted network or the public internet.
 """
 
