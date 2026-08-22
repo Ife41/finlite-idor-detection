@@ -1,4 +1,3 @@
-[finlite-idor-detection-README.md](https://github.com/user-attachments/files/31337806/finlite-idor-detection-README.md)
 # Custom SAST Rules for IDOR/BOLA Detection
 
 Static analysis rules and a CI/CD pipeline that catch IDOR (Insecure Direct Object Reference, also known as Broken Object Level Authorization) before code reaches production. Tested against [FinLite](https://github.com/Ife41/finlite-vulnerable-webapp), a fintech-style app built specifically as a target.
