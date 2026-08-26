@@ -1,10 +1,17 @@
 """
-FinLite - A demo fintech-style organization web app used to practice and
+FinLite - A small demo fintech-style API/web app used to practice and
 demonstrate multiple vulnerability classes. Each intentional vulnerability
 is clearly commented with a VULN tag.
 
-INTENTIONALLY VULNERABLE. For isolated lab use only, never expose this
-to an untrusted network or the public internet.
+This is the FIXED version of app.py, used to demonstrate the custom
+Semgrep rules in this repo passing on corrected code. The vulnerable
+version (used to demonstrate the rules failing the build) lives in the
+finlite-vulnerable-webapp repo and stays intentionally unpatched there.
+
+INTENTIONALLY VULNERABLE in the remaining, unfixed spots (A, D, E, F, G) -
+only VULN B (IDOR) and VULN C (header-based authz bypass) are fixed here,
+since those are the two patterns the Semgrep rules in this repo target.
+For isolated lab use only.
 """
 
 from flask import Flask, request, jsonify, session, render_template, redirect, url_for, flash
@@ -74,7 +81,7 @@ def inject_session_username():
 @app.route("/")
 def index():
     return jsonify({
-        "app": "FinLite Demo API (intentionally vulnerable)",
+        "app": "FinLite Demo API",
         "status": "running",
         "web_ui": "/ui/login",
         "endpoints": [
@@ -95,6 +102,9 @@ def login():
 
     user = find_user_by_username(username)
 
+    # VULN A (still present): distinct error messages leak whether the
+    # username exists. Not covered by the current Semgrep rules in this
+    # repo, left unfixed here intentionally, see project roadmap.
     if not user:
         return jsonify({"error": "User does not exist"}), 401
 
@@ -134,6 +144,9 @@ def api_register():
 
     conn = get_db()
     try:
+        # VULN E (still present): client-supplied "role" field is trusted
+        # with no whitelist. Not covered by the current Semgrep rules in
+        # this repo, left unfixed here intentionally.
         cursor = conn.execute(
             "INSERT INTO users (username, email, password, role) VALUES (?, ?, ?, ?)",
             (
@@ -185,9 +198,17 @@ def register_page():
 
     create_starter_invoices(new_user_id, username)
 
-    flash("Account created — please sign in")
+    flash("Account created - please sign in")
     return redirect(url_for("login_page"))
 
+
+# ---------------------------------------------------------------------------
+# FIXED: VULN B - IDOR on invoice access
+# ---------------------------------------------------------------------------
+# Added an explicit ownership check: the invoice's owner_id must match
+# the logged-in user's session before it is ever returned. This is the
+# exact safe pattern the idor-missing-ownership-check Semgrep rule was
+# validated against.
 
 @app.route("/invoices/<int:invoice_id>")
 @login_required
@@ -201,15 +222,26 @@ def get_invoice(invoice_id):
     if not invoice:
         return jsonify({"error": "Invoice not found"}), 404
 
-    return jsonify(dict(invoice))
+    if invoice["owner_id"] == session["user_id"]:
+        return jsonify(dict(invoice))
+
+    return jsonify({"error": "Invoice not found"}), 404
+
+
+# ---------------------------------------------------------------------------
+# FIXED: VULN C - IDOR via trusted client header
+# ---------------------------------------------------------------------------
+# Removed the client-supplied X-Admin header entirely from the
+# authorization decision. Access to all invoices is now decided purely by
+# the real, server-verified role stored in the session at login. This is
+# the exact safe pattern the header-based-authz-bypass Semgrep rule was
+# validated against.
 
 @app.route("/invoices/all")
 @login_required
 def get_all_invoices():
-    is_admin_header = request.headers.get("X-Admin", "false").lower() == "true"
-
     conn = get_db()
-    if is_admin_header:
+    if session["role"] == "admin":
         invoices = conn.execute("SELECT * FROM invoices").fetchall()
     else:
         invoices = conn.execute(
@@ -219,12 +251,16 @@ def get_all_invoices():
 
     return jsonify([dict(i) for i in invoices])
 
+
 @app.route("/invoices/search")
 @login_required
 def search_invoices():
     q = request.args.get("q", "")
 
     conn = get_db()
+    # VULN D (still present): string formatting directly into SQL. Not
+    # covered by the current Semgrep rules in this repo, left unfixed
+    # here intentionally.
     query = f"SELECT * FROM invoices WHERE description LIKE '%{q}%'"
     try:
         results = conn.execute(query).fetchall()
@@ -280,7 +316,7 @@ def invoice_page(invoice_id):
     invoice = conn.execute("SELECT * FROM invoices WHERE id = ?", (invoice_id,)).fetchone()
     conn.close()
 
-    if not invoice:
+    if not invoice or invoice["owner_id"] != session["user_id"]:
         flash("Invoice not found")
         return redirect(url_for("dashboard_page"))
 
@@ -326,6 +362,9 @@ def view_post_page(post_id):
         flash("Post not found")
         return redirect(url_for("posts_page"))
 
+    # VULN F (still present): |safe in view_post.html disables
+    # autoescaping. Not covered by the current Semgrep rules in this
+    # repo, left unfixed here intentionally.
     return render_template("view_post.html", post=post)
 
 
@@ -344,6 +383,9 @@ def new_post_page():
     image_filename = None
     uploaded_file = request.files.get("image")
     if uploaded_file and uploaded_file.filename:
+        # VULN G (still present): no extension/content-type validation.
+        # Not covered by the current Semgrep rules in this repo, left
+        # unfixed here intentionally.
         image_filename = uploaded_file.filename
         save_path = os.path.join(UPLOAD_FOLDER, image_filename)
         uploaded_file.save(save_path)
