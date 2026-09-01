@@ -1,24 +1,20 @@
 name: IDOR Security Scan
-
 on: [push, pull_request]
-
 jobs:
   semgrep:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
         uses: actions/checkout@v4
-
       - name: Install Semgrep
         run: |
           python3 -m pip install pipx
           pipx install semgrep
           pipx ensurepath
-
       - name: Run custom IDOR rules
         run: semgrep --config semgrep-rules/ --error app.py
 
-sca:
+  sca:
     runs-on: ubuntu-latest
     steps:
       - name: Check out code
