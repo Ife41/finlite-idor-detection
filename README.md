@@ -1,6 +1,6 @@
 # Custom SAST Rules for IDOR/BOLA Detection
 
-Static analysis rules and a CI/CD pipeline that catch IDOR (Insecure Direct Object Reference, also known as Broken Object Level Authorization) before code reaches production. Tested against [FinLite](https://github.com/Ife41/finlite-vulnerable-webapp), a fintech-style app built specifically as a target.
+Static analysis rules and a CI/CD pipeline that catch IDOR (Insecure Direct Object Reference, also known as Broken Object Level Authorization) before code reaches production. Tested against [FinLite](https://github.com/Ife41/finlite-vulnerable-webapp), a fintech-style app built specifically as a target. The pipeline also runs a dependency vulnerability scan, so known-vulnerable third-party packages are caught the same way custom code flaws are.
 
 IDOR is one of the most common vulnerabilities in financial applications, and it doesn't follow one detectable pattern. Generic scanners tend to catch injection bugs easily but miss authorization logic almost entirely, since that depends on how a specific app is written. This project takes a different approach: rules written for known-vulnerable patterns found in a real codebase, rather than relying on off-the-shelf detection to catch something it was never designed to catch.
 
@@ -12,7 +12,8 @@ IDOR is one of the most common vulnerabilities in financial applications, and it
 |---|---|
 | `semgrep-rules/idor-missing-ownership-check.yaml` | Flags a record fetched by ID and returned with no check confirming the requesting user owns it |
 | `semgrep-rules/header-based-authz-bypass.yaml` | Flags an authorization decision based on a client-controlled HTTP header instead of a server-verified value |
-| `.github/workflows/security-scan.yml` | GitHub Actions pipeline that runs both rules on every push and pull request, failing the build if either pattern is found |
+| `requirements.txt` | Pinned dependencies for FinLite, scanned for known vulnerabilities as part of the pipeline |
+| `.github/workflows/security-scan.yml` | GitHub Actions pipeline that runs the Semgrep rules and a dependency scan on every push and pull request, failing the build if either an IDOR pattern or a vulnerable dependency is found |
 | `findings/FINDING-REPORT-idor.md` | Write-up of both vulnerabilities as found in FinLite, including risk, location, vulnerable code, and recommended fix |
 
 ---
@@ -60,13 +61,11 @@ semgrep --config semgrep-rules/ --error /path/to/app.py
 
 ## CI/CD pipeline
 
-The included GitHub Actions workflow (`.github/workflows/security-scan.yml`) runs both rules automatically on every push and pull request. If either pattern shows up, the build fails, so the change can't be merged or deployed until it's fixed.
+The included GitHub Actions workflow (`.github/workflows/security-scan.yml`) runs the Semgrep rules and a dependency vulnerability scan automatically on every push and pull request. If either an IDOR pattern or a known-vulnerable dependency shows up, the build fails, so the change can't be merged or deployed until it's fixed.
 
 ```yaml
 name: IDOR Security Scan
-
 on: [push, pull_request]
-
 jobs:
   semgrep:
     runs-on: ubuntu-latest
@@ -79,9 +78,22 @@ jobs:
           pipx ensurepath
       - name: Run custom IDOR rules
         run: semgrep --config semgrep-rules/ --error app.py
+
+  sca:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install pip-audit
+        run: python3 -m pip install pip-audit
+      - name: Run dependency vulnerability scan
+        run: pip-audit -r requirements.txt
 ```
 
 ---
+
+## Why add SCA alongside SAST
+
+Semgrep's rules in this repo catch flaws in code that was actually written for this project. They can't see anything about the third-party packages that code depends on. A dependency can be perfectly used and still carry a known, publicly disclosed vulnerability that has nothing to do with how it's called. `pip-audit` closes that gap by checking every package resolved from `requirements.txt`, including transitive dependencies pulled in by Flask itself, against the PyPI Advisory Database. As of the current pinned versions, the scan finds nothing. That result is checked fresh on every push rather than assumed permanent, since a new release of any dependency could introduce a finding without any code here changing at all.
 
 ## Why two separate rules instead of one
 
