@@ -57,6 +57,7 @@ pip3 install semgrep --break-system-packages
 git clone https://github.com/Ife41/finlite-idor-detection.git
 cd finlite-idor-detection
 semgrep --config semgrep-rules/ --error /path/to/app.py
+pip-audit -r requirements.txt
 ```
 
 ## CI/CD pipeline
