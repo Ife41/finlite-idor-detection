@@ -1,4 +1,4 @@
-# Custom SAST Rules for IDOR/BOLA Detection, with Dependency Vulnerability Scanning
+# IDOR/BOLA Detection and Dependency Scanning in CI/CD
 
 Static analysis rules and a CI/CD pipeline that catch IDOR (Insecure Direct Object Reference, also known as Broken Object Level Authorization) before code reaches production. Tested against [FinLite](https://github.com/Ife41/finlite-vulnerable-webapp), a fintech-style app built specifically as a target. The pipeline also runs a dependency vulnerability scan, so known-vulnerable third-party packages are caught the same way custom code flaws are.
 
