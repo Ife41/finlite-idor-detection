@@ -17,3 +17,13 @@ jobs:
 
       - name: Run custom IDOR rules
         run: semgrep --config semgrep-rules/ --error app.py
+
+sca:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+      - name: Install pip-audit
+        run: python3 -m pip install pip-audit
+      - name: Run dependency vulnerability scan
+        run: pip-audit -r requirements.txt
